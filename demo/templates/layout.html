@@ -1,0 +1,76 @@
+{% if not request.is_xhr -%}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Addressing Test</title>
+  <script type="text/javascript" src="/static/vendor/jquery-1.6.2.js"></script>
+
+  <script type="text/javascript" src="/static/vendor/history.js-1.7/json2.js"></script>
+  <script type="text/javascript" src="/static/vendor/history.js-1.7/amplify.store.js"></script>
+  <script type="text/javascript" src="/static/vendor/history.js-1.7/history.adapter.jquery.js"></script>
+  <script type="text/javascript" src="/static/vendor/history.js-1.7/history.js"></script>
+  <script type="text/javascript" src="/static/vendor/history.js-1.7/history.html4.js"></script>
+
+  <script type="text/javascript" src="/static/scripts/router.js"></script>
+  <script type="text/javascript">
+    (function () {
+      router.configure({
+        containerToUpdate: '#content',
+
+        defaultTransitionOut: function (el, callback) {
+          el.animate({ opacity: 0 }, 500, 'swing', callback);
+        },
+
+        defaultTransitionIn: function (el, callback) {
+          el.animate({ opacity: 1 }, 500, 'swing', callback);
+        }
+      });
+    })();
+  </script>
+
+  <style type="text/css">
+    body {
+      font: normal 1em/1.5 "Georgia", serif;
+      padding: 25px;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin: 0 0 0.8em;
+    }
+    p, ul {
+      margin: 0 0 1.5em;
+    }
+    #content-wrapper {
+      background: #ddd;
+      border: 1px solid #000;
+      padding: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Internal, routable links</h1>
+  <ul>
+    <li><a href="test1.html">Test 1</a></li>
+    <li><a href="test2.html">Test 2</a></li>
+    <li><a href="test3.html">Test 3</a></li>
+    <li><a href="test4.html">Test 4</a></li>
+  </ul>
+
+  <h1>External or links flagged not routable</h1>
+  <ul>
+    <li><a href="http://www.google.com">Google.com</a></li>
+    <li><a href="test4.html" data-no-routing="true">Test 4, flagged as a non-route.</a></li>
+  </ul>
+
+  <h2>Content target</h2>
+  <div id="content-wrapper">
+    <div id="content">
+{% endif -%}
+      {% block content %}{% endblock %}
+{% if not request.is_xhr -%}
+    </div>
+  </div>
+</body>
+</html>
+{% endif -%}
