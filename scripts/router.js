@@ -1,15 +1,17 @@
 var router = (function (window, $, History, undefined) {
     var document = window.document,
+        location = window.location,
         console = window.console || { log: function () {} },
         setTimeout = window.setTimeout,
 
         initialized,
         routes = [],
         currentPath, 
-        currentRoute,
+        currentRoute, defaultRoute,
         containerToUpdate,
 
         // options with default values
+        siteRoot = new RegExp(location.protocol + '//' + location.host),
         defaultTitle = document.title,
         defaultAction = function () {},
         beforeUpdateBegins = defaultAction,
@@ -27,6 +29,44 @@ var router = (function (window, $, History, undefined) {
     if (!$ || !History || !History.enabled) {
         return false;
     }
+
+    var createRoute = (function () {
+        var baseFunctions = ['beforeShowingContent', 'afterShowingContent', 'unloadContent', 'willUpdateInternally'],
+            length = baseFunctions.length;
+        
+        return function (pattern, opts) {
+            // function to determine if path matches this route
+            var api = function (testPath) {
+                    return pattern.test(testPath.replace(siteRoot, ''));
+                },
+                i = 0,
+                defaultAction = function () { return false; };
+
+            opts = opts || {};
+            pattern = new RegExp(pattern);
+
+            // attach any defined settings to the route
+            for (; i < length; ++i) {
+                if (opts[baseFunctions[i]]) {
+                    api[baseFunctions[i]] = opts[baseFunctions[i]];
+                } else {
+                    api[baseFunctions[i]] = defaultAction;
+                }
+            };
+
+            api.bodyID = opts.bodyID || '';
+            api.bodyClass = opts.bodyClass || '';
+            api.noRouting = opts.noRouting || false;
+
+            api.transitionIn = opts.transitionIn || null;
+            api.transitionOut = opts.transitionOut || null;
+
+            // for debugging purposes; remove this later!
+            api.pattern = pattern.toString();
+            
+            return api;
+        };
+    })();
 
     // find a route whose pattern matches the given path
     function findRoute(path) {
@@ -63,8 +103,13 @@ var router = (function (window, $, History, undefined) {
             
             beforeUpdateBegins(containerToUpdate);
 
-            if (route.transitionOut) {
-                route.transitionOut(containerToUpdate, transitionFinished);
+            if (currentRoute && currentRoute.transitionOut) {
+                try {
+                    currentRoute.transitionOut(containerToUpdate, transitionFinished);
+                } catch(e) {
+                    console.log('error during transition in: ' + e.name + ', ' + e.message);
+                    defaultTransitionOut(containerToUpdate, transitionFinished);
+                }
             } else {
                 defaultTransitionOut(containerToUpdate, transitionFinished);
             }
@@ -107,7 +152,12 @@ var router = (function (window, $, History, undefined) {
             route.beforeShowingContent();
             
             if (route.transitionIn) {
-                route.transitionIn(containerToUpdate, transitionFinished);
+                try {
+                    route.transitionIn(containerToUpdate, transitionFinished);
+                } catch (e) {
+                    console.log('error during transition out: ' + e.name + ', ' + e.message);
+                    defaultTransitionIn(containerToUpdate, transitionFinished);                    
+                }
             } else {
                 defaultTransitionIn(containerToUpdate, transitionFinished);
             }
@@ -127,6 +177,7 @@ var router = (function (window, $, History, undefined) {
 
             // see if we found a matching route
             if (route) {
+                console.log('route found: ' + route.pattern);
 
                 // if we specifically flagged this route to not be handled, simply update the address to reload the page
                 if (route.noRouting) {
@@ -142,9 +193,9 @@ var router = (function (window, $, History, undefined) {
                 }
 
 
-            // no matching route was found; just fetch the page and guess at the body ID
+            // no matching route was found; just fetch the page with the default route
             } else {
-                hideContent(path, router.defaultRoute);
+                hideContent(path, defaultRoute);
             }
         }
 
@@ -167,7 +218,6 @@ var router = (function (window, $, History, undefined) {
             path = state.url;
 
         console.log('path changed: ' + path);
-        History.log('path changed: ' + path);
         
         updatePage(path);
 
@@ -185,37 +235,47 @@ var router = (function (window, $, History, undefined) {
     }
 
     function checkClick(e) {
-        var link = e.target;
+        var el = e.target;
 
-        // see if we clicked a link
-        while (link && link.tagName !== 'A' && link.tagName != 'BODY') {
-            link = link.parentNode;
+        // see if we clicked an anchor
+        while (el && el.tagName !== 'A' && el.tagName != 'BODY') {
+            el = el.parentNode;
         }
 
         // now see if we should route this or just let go
-        if (link && link.tagName === 'A' && !link.getAttribute('data-no-routing')) {
-            go(link.href);
+        if (el && el.tagName === 'A' && siteRoot.test(el) && !el.getAttribute('data-no-routing')) {
+            go(el.href);
             return false;
         }
 
         return true;
     }
 
+    // initialization...
+    defaultRoute = createRoute(/.*/);
+    
     $(document).ready(function () {
         var body = $(document.body);
+
+        currentPath = window.location.href;
+        currentRoute = findRoute(currentPath) || defaultRoute;
+
+        History.Adapter.bind(window, 'statechange', addressChanged);
 
         body.click(checkClick);
         containerToUpdate = containerToUpdate || body;
 
-        History.Adapter.bind(window, 'statechange', addressChanged);
-
         console.log('router initialized');
+        console.log('siteRoot: ' + siteRoot.toString());
     });
 
     return {
         configure: function (opts) {
             defaultTransitionOut = opts.defaultTransitionOut || defaultTransitionOut;
             defaultTransitionIn = opts.defaultTransitionIn || defaultTransitionIn;
+
+            // make sure siteRoot does not include a trailiing slash
+            siteRoot = opts.siteRoot ? new RegExp(opts.siteRoot.replace(/\/$/, '')) : siteRoot;
 
             if (opts.containerToUpdate) {
                 $(document).ready( function () {
@@ -237,41 +297,8 @@ var router = (function (window, $, History, undefined) {
             }
         },
 
+        createRoute: createRoute,
+        
         go: go
     };
 })(window, jQuery, History);
-
-router.createRoute = (function () {
-    var baseFunctions = ['beforeShowingContent', 'afterShowingContent', 'unloadContent', 'willUpdateInternally'],
-        length = baseFunctions.length;
-    
-    return function (pattern, opts) {
-        // function to determine if path matches this route
-        var api = function (testPath) { return pattern.test(testPath); },
-            i = 0,
-            defaultAction = function () { return false; };
-
-        opts = opts || {};
-        pattern = new RegExp(pattern);
-
-        // attach any defined settings to the route
-        for (; i < length; ++i) {
-            if (opts[baseFunctions[i]]) {
-                api[baseFunctions[i]] = opts[baseFunctions[i]];
-            } else {
-                api[baseFunctions[i]] = defaultAction;
-            }
-        };
-
-        api.bodyID = opts.bodyID || '';
-        api.bodyClass = opts.bodyClass || '';
-        api.noRouting = opts.noRouting || false;
-
-        api.transitionIn = opts.transitionIn || null;
-        api.transitionOut = opts.transitionOut || null;
-
-        return api;
-    };
-})();
-
-router.defaultRoute = router.createRoute(/.*/);
