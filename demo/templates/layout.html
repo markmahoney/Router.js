@@ -26,6 +26,28 @@
           el.animate({ opacity: 1 }, 500, 'swing', callback);
         }
       });
+
+      router.addRoute(router.createRoute(/^(?:\/|\/test1.html)$/, {
+        transitionIn: function (el, callback) {
+          el.parent().height(el.parent().height());
+          el.css({ position: 'absolute', left: '100px', opacity: '0' });
+          el.animate({ left: 10, opacity: 1 }, 200, 'swing', function () {
+            el.css({ position: 'static', left: 'auto', opacity: '1' });
+            el.parent().height(undefined);
+            callback();
+          });
+        },
+
+        transitionOut: function (el, callback) {
+          el.parent().height(el.parent().height());
+          el.css({ position: 'absolute', left: '10px', opacity: '1' });
+          el.animate({ left: -100, opacity: 0 }, 200, 'swing', function () {
+            el.css({ position: 'static', left: 'auto', opacity: '0' });
+            el.parent().height(undefined);
+            callback();
+          });
+        }
+      }));
     })();
   </script>
 
@@ -43,7 +65,9 @@
     #content-wrapper {
       background: #ddd;
       border: 1px solid #000;
+      overflow: hidden;
       padding: 10px;
+      position: relative;
     }
   </style>
 </head>
@@ -51,7 +75,7 @@
 <body>
   <h1>Internal, routable links</h1>
   <ul>
-    <li><a href="test1.html">Test 1</a></li>
+    <li><a href="test1.html">Test 1 (with custom transitions)</a></li>
     <li><a href="test2.html">Test 2</a></li>
     <li><a href="test3.html">Test 3</a></li>
     <li><a href="test4.html">Test 4</a></li>
@@ -60,7 +84,7 @@
   <h1>External or links flagged not routable</h1>
   <ul>
     <li><a href="http://www.google.com">Google.com</a></li>
-    <li><a href="test4.html" data-no-routing="true">Test 4, flagged as a non-route.</a></li>
+    <li><a href="test4.html" data-no-routing="true">Test 4, flagged to be not routed (should reload page).</a></li>
   </ul>
 
   <h2>Content target</h2>
