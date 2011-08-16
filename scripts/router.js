@@ -68,6 +68,8 @@ var router = (function (window, $, History, undefined) {
         };
     })();
 
+    defaultRoute = createRoute(/.*/);
+
     // find a route whose pattern matches the given path
     function findRoute(path) {
         var route = null;
@@ -251,37 +253,36 @@ var router = (function (window, $, History, undefined) {
         return true;
     }
 
-    // initialization...
-    defaultRoute = createRoute(/.*/);
-    
-    $(document).ready(function () {
-        var body = $(document.body);
-
-        currentPath = window.location.href;
-        currentRoute = findRoute(currentPath) || defaultRoute;
-
-        History.Adapter.bind(window, 'statechange', addressChanged);
-
-        body.click(checkClick);
-        containerToUpdate = containerToUpdate || body;
-
-        console.log('router initialized');
-        console.log('siteRoot: ' + siteRoot.toString());
-    });
-
     return {
-        configure: function (opts) {
+        init: function (opts) {
             defaultTransitionOut = opts.defaultTransitionOut || defaultTransitionOut;
             defaultTransitionIn = opts.defaultTransitionIn || defaultTransitionIn;
 
             // make sure siteRoot does not include a trailiing slash
             siteRoot = opts.siteRoot ? new RegExp(opts.siteRoot.replace(/\/$/, '')) : siteRoot;
 
-            if (opts.containerToUpdate) {
-                $(document).ready( function () {
-                    containerToUpdate = $(opts.containerToUpdate);
-                });
-            }
+            currentPath = window.location.href;
+            currentRoute = findRoute(currentPath) || defaultRoute;
+
+            $(document).ready(function () {
+                var body = $(document.body),
+                    hashValue;
+
+                History.Adapter.bind(window, 'statechange', addressChanged);
+
+                body.click(checkClick);
+                containerToUpdate = opts.containerToUpdate ? $(opts.containerToUpdate) : body;
+
+                // if we are emulating pushState, then the initial view may need to be updated with the hash value route
+                if (History.emulated.pushState) {
+                    hashValue = History.getState().hash;
+                    if (hashValue !== './') {
+                        go(hashValue, true);
+                    }
+                }
+
+                console.log('router initialized');
+            });
         },
 
         // add a route to the list
